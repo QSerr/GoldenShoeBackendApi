@@ -166,6 +166,7 @@ app.get('/checkoutBasket', (req, res) => {
         arrayOfIndexToRemove.push(i)
       }
     }
+    
     console.log("arrayOfIndexToRemove : ", arrayOfIndexToRemove);
     // console.log("before : ", );
     for (let i = 0; i < arrayOfIndexToRemove.length; i++) {
