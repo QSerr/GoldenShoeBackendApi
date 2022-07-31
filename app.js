@@ -34,8 +34,9 @@ const products = [
 
 const vouchers = [
   {sessionToken: "1", voucherCode: "GOLD2022", priceReduction: 0.1, expiryDate: "2022-07-28T03:24:00"},
-  {sessionToken: "1", voucherCode: "GOLD20%", priceReduction: 0.2, expiryDate: "2022-07-29T03:24:00"},
-  {sessionToken: "1", voucherCode: "GOLD20%", priceReduction: 0.2, expiryDate: "2022-07-30T03:24:00"},
+  {sessionToken: "1", voucherCode: "GOLD20%", priceReduction: 0.2, expiryDate: "2022-08-01T03:24:00"},
+  {sessionToken: "1", voucherCode: "GOLD20%", priceReduction: 0.2, expiryDate: "2022-08-02T03:24:00"},
+  {sessionToken: "1", voucherCode: "GOLD50%", priceReduction: 0.5, limit: 50,expiryDate: "2022-08-02T03:24:00"},
 ]
 
 app.get('/', (req, res) => {
@@ -130,11 +131,11 @@ app.get('/checkVoucher', (req, res) => {
   // console.log(req.query);
   const voucherCode = req.query.voucherCode
   // console.log(voucherCode);
-  const sessionToken = (req.params.sessionToken ? req.params.sessionToken : "1")
+  const sessionToken = (req.query.sessionToken ? req.query.sessionToken : "1")
   const nowEpoch = Date.now()
   console.log(vouchers.findIndex(e => e.sessionToken == sessionToken && e.voucherCode == voucherCode));
   const voucherIndex = vouchers.findIndex(e => e.sessionToken == sessionToken && e.voucherCode == voucherCode && nowEpoch < new Date(e.expiryDate).valueOf())
-  console.log("voucherIndex : ", voucherIndex);
+  console.log("voucherIndex : ", voucherIndex, voucherCode);
   setTimeout(function() {
     res.status(200).json({voucherIndex:voucherIndex})
   }, 300);
@@ -143,14 +144,10 @@ app.get('/checkVoucher', (req, res) => {
 app.get('/checkoutBasket', (req, res) => {
   const voucherCode = req.query.voucherCode
   const sessionToken = (req.body.sessionToken ? req.body.sessionToken : 1)
-  const inBasketProducts = baskets.find(e => e.sessionToken == sessionToken)
-  let totalPrice=inBasketProducts.products.reduce(
-    (previousValue, currentValue) => previousValue + (currentValue.product.price * currentValue.quantity),
-    0
-    )
+  const basket = baskets.find(e => e.sessionToken == sessionToken)
+  let totalPrice=basket.products.reduce((previousValue, currentValue) => previousValue + (currentValue.product.price * currentValue.quantity),0)
     let arrayInError = []
     let arrayOfIndexToRemove = []
-    const basket = baskets.find(e => e.sessionToken == (req.params["sessionstoken"] ? req.params["sessionstoken"] : 1))
     for (let i = 0; i < basket.products.length; i++) {
       const product = basket.products[i];
       if(product.quantity > products.find(e => e.id == product.product.id).availableSizes.find(w => w.size == product.selectedSize).quantity){
@@ -169,8 +166,9 @@ app.get('/checkoutBasket', (req, res) => {
     
     console.log("arrayOfIndexToRemove : ", arrayOfIndexToRemove);
     // console.log("before : ", );
-    for (let i = 0; i < arrayOfIndexToRemove.length; i++) {
+    for (let i = arrayOfIndexToRemove.length-1; i > -1; i--) {
       const index = arrayOfIndexToRemove[i];
+      console.log(index);
       baskets.find(e => e.sessionToken == (req.params["sessionstoken"] ? req.params["sessionstoken"] : 1)).products.splice(index,1)
     }
     if(voucherCode) {
@@ -178,7 +176,9 @@ app.get('/checkoutBasket', (req, res) => {
       console.log(vouchers.findIndex(e => e.sessionToken == sessionToken && e.voucherCode == voucherCode));
       const voucherIndex = vouchers.findIndex(e => e.sessionToken == sessionToken && e.voucherCode == voucherCode && nowEpoch < new Date(e.expiryDate).valueOf())
       // console.log("voucherIndex : ", voucherIndex);
-      totalPrice = totalPrice - totalPrice * vouchers[voucherIndex].priceReduction
+      const priceReduction = totalPrice * vouchers[voucherIndex].priceReduction
+      const limitedPriceReduction = priceReduction > vouchers[voucherIndex].limit ? vouchers[voucherIndex].limit : priceReduction
+      totalPrice = totalPrice - limitedPriceReduction
     }
     setTimeout(function() {
       res.status(200).json({arrayInError: arrayInError, totalPrice: totalPrice})
@@ -212,6 +212,26 @@ app.get('/checkoutBasket', (req, res) => {
     }, 300);
   })
   
+  app.get('/removeStock', (req,res) => {
+      const productID = req.query.productID
+      const quantity = req.query.quantity
+      const size = req.query.size
+      console.log("productID, quantity, size : ", productID, quantity, size);
+      if(quantity > products.find(e => e.id == productID).availableSizes.find(w => w.size == size).quantity){
+        console.log("removing more items than are available");
+        // arrayInError.push({name: product.product.name, size: size,quantity: product.quantity - products.find(e => e.id == productID).availableSizes.find(w => w.size == size).quantity })
+      } else {
+        //remove size from available sizes array if quantity = 0
+        const sizeIndex = products.find(e => e.id == productID).availableSizes.findIndex(w => w.size == size)
+        products.find(e => e.id == productID).availableSizes[sizeIndex].quantity -= quantity
+        if(products.find(e => e.id == productID).availableSizes[sizeIndex].quantity == 0){
+          products.find(e => e.id == productID).availableSizes.splice(sizeIndex, 1)
+        }
+        // arrayOfIndexToRemove.push(i)
+      }
+      res.sendStatus(200)
+  })
+
   app.listen(port, () => {
     console.log(`Example app listening on port ${port}`)
   })
